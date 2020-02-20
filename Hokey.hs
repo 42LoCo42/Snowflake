@@ -3,6 +3,7 @@ module Hokey where
 import Snowflake
 import Data.List
 
+-- Entrypoint, gets stack
 hokey :: [List] -> Polarity -> [List]
 hokey [] _ = []
 hokey (h:t) pol =
@@ -11,6 +12,7 @@ hokey (h:t) pol =
   else
     (listToZList $ List (polOf h) $ segmTrns $ ignoReve $ listOf h) : t
 
+-- Subroutine, gets first stack element
 segmTrns :: [List] -> [List]
 segmTrns l
   | special   = l
@@ -19,8 +21,8 @@ segmTrns l
     segments = groupBy (\l0 -> \l1 -> (lenOf l0 == lenOf l1) && (polOf l0 == polOf l1)) l
     special  = isSpecial segments
 
-flatten :: [[a]] -> [a]
-flatten ass = [a | as <- ass, a <- as] -- i am sorry
+flatten :: [[x]] -> [x]
+flatten xss = [x | xs <- xss, x <- xs]
 
 transposeSNF :: [List] -> [List]
 transposeSNF s
@@ -43,6 +45,7 @@ isSpecial (s0:r0) =
     (s0_0:_) = s0
     (s1_0:_) = s1
 
+-- Subroutine, gets first stack element
 ignoReve :: [List] -> [List]
 ignoReve l = place trg els
   where

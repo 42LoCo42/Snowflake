@@ -4,11 +4,11 @@ import System.Random
 
 data Polarity = Pos
               | Neg
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data List = List  Polarity [List]
           | ZList Polarity Int -- ZeroList: -3 =  -[+[]+[]+[]] = -[+0+0+0]
-  deriving (Eq)
+  deriving (Show, Eq)
 
 data ThreadType = Shiny
                 | Tarnished
@@ -52,14 +52,6 @@ revPol (List Pos l)  = List Neg l
 revPol (List Neg l)  = List Pos l
 revPol (ZList Pos l) = ZList Neg l
 revPol (ZList Neg l) = ZList Pos l
-
-instance Show Polarity where
-  show Pos = "+"
-  show Neg = "-"
-
-instance Show List where
-  show (ZList p l) = show p ++ show l
-  show (List p es) = show p ++ "[" ++ (foldr (++) "" $ map show es) ++ "]"
 
 nextWrap :: IO ([Int], StdGen) -> IO ([Int], StdGen)
 nextWrap this = appendGen <$> this
