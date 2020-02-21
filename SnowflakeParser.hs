@@ -5,19 +5,17 @@ import Snowflake
 import Control.Applicative
 import Data.Char
 
-polarityP :: Parser ([List] -> List)
-polarityP =
-  ((\_ -> List Pos) <$> charP '+') <|>
-  ((\_ -> List Neg) <$> charP '-')
-
-polarityPZ :: Parser (Int -> List)
-polarityPZ =
-  ((\_ -> ZList Pos) <$> charP '+') <|>
-  ((\_ -> ZList Neg) <$> charP '-')
+polarityP :: (Polarity -> a -> List) -> Parser (a -> List)
+polarityP typ =
+  ((\_ -> typ Pos) <$> charP '+') <|>
+  ((\_ -> typ Neg) <$> charP '-')
 
 rawListP :: Parser [List]
 rawListP = charP '[' *> many listP <* charP ']'
 
+numP :: Parser Int
+numP = read <$> spanP isNumber
+
 listP :: Parser List
-listP = (polarityP <*> rawListP) <|>
-        (polarityPZ <*> (read <$> spanP isNumber))
+listP = (polarityP List <*> rawListP) <|>
+        (polarityP ZList <*> numP)
