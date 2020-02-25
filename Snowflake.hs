@@ -4,11 +4,11 @@ import System.Random
 
 data Polarity = Pos
               | Neg
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data List = List  Polarity [List]
           | ZList Polarity Int -- ZeroList: -3 =  -[+[]+[]+[]] = -[+0+0+0]
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data ThreadType = Shiny
                 | Tarnished

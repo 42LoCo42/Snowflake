@@ -7,3 +7,7 @@ Main: $(SRCS)
 
 clean:
 	rm -f $(OBJS) $(INFS)
+
+reset:
+	cp SaveState.hs.old SaveState.hs
+	make
