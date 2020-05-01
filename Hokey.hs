@@ -6,11 +6,11 @@ import Data.List
 -- Entrypoint, gets stack
 hokey :: [List] -> Polarity -> [List]
 hokey [] _ = []
-hokey (h:t) pol =
-  if pol == Pos then
-    (listToZList $ List (polOf h) $ ignoReve $ segmTrns $ listOf h) : t
-  else
-    (listToZList $ List (polOf h) $ segmTrns $ ignoReve $ listOf h) : t
+hokey (h:t) pol
+  | pol == Pos
+  = listToZList (List (polOf h) $ ignoReve $ segmTrns $ listOf h) : t
+  | otherwise
+  = listToZList (List (polOf h) $ segmTrns $ ignoReve $ listOf h) : t
 
 -- Subroutine, gets first stack element
 segmTrns :: [List] -> [List]
@@ -18,7 +18,7 @@ segmTrns l
   | special   = l
   | otherwise = flatten $ map transposeSNF segments
   where
-    segments = groupBy (\l0 -> \l1 -> (lenOf l0 == lenOf l1) && (polOf l0 == polOf l1)) l
+    segments = groupBy (\l0 l1 -> (lenOf l0 == lenOf l1) && (polOf l0 == polOf l1)) l
     special  = isSpecial segments
 
 flatten :: [[x]] -> [x]
@@ -30,8 +30,7 @@ transposeSNF s
   | otherwise     = s'
   where
     (s0:_) = s
-    s'     = map (\ls -> listToZList $ List (polOf $ head s) $
-             map (\l -> listToZList l) ls) $ transpose $ map listOf s
+    s'     = map (listToZList . List (polOf $ head s) . map listToZList) $ transpose $ map listOf s
 
 isSpecial :: [[List]] -> Bool
 isSpecial []      = False
@@ -49,13 +48,13 @@ isSpecial (s0:r0) =
 ignoReve :: [List] -> [List]
 ignoReve l = place trg els
   where
-    trg = map (\l -> ZList (polOf l) (lenOf l)) l
-    els = reverse $ foldr (++) [] $ map listOf l
+    trg = map (\li -> ZList (polOf li) (lenOf li)) l
+    els = reverse $ concatMap listOf l
 
 --       Target    Elements  Result
 place :: [List] -> [List] -> [List]
 place []     _  = []
 place _      [] = []
-place (t:ts) es = (listToZList $ List (polOf t) (map listToZList $ take c es)) : place ts (drop c es)
+place (t:ts) es = listToZList (List (polOf t) (map listToZList $ take c es)) : place ts (drop c es)
   where
     c = lenOf t

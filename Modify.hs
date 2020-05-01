@@ -19,20 +19,22 @@ abbrev program
   where
     nopdel = map fst $ filter (\(_, ts) -> ts /= ["nop"]) $
              zip program (map translate program)
-    result = invdel $ nopdel
+    result = invdel nopdel
     invdel []      = []
     invdel [l]     = [l]
     invdel (l0:l1:t)
-      | (polOf l0 /= polOf l1 &&
-        lenOf l0 == lenOf l1) = invdel t
-      | otherwise             = l0 : invdel (l1:t)
+      | polOf l0 /= polOf l1 &&
+        lenOf l0 == lenOf l1
+      = invdel t
+      | otherwise
+      = l0 : invdel (l1:t)
 
 -- Zip each pair with square of count
 pairsquares :: [List] -> [((List, List), Int)]
 pairsquares []      = []
 pairsquares [_]     = []
 pairsquares program = filter (\(e, _) -> canChoose e) $
-                      map (\l@(e:_) -> (e, length l ^ 2)) $ group $ sort $
+                      map (\l@(e:_) -> (e, length l ^ (2 :: Integer))) $ group $ sort $
                       zip program (tail program)
   where
     -- Pairs with same length cannot be chosen
@@ -40,26 +42,30 @@ pairsquares program = filter (\(e, _) -> canChoose e) $
 
 -- Prepare counts for random selection
 conv2prob :: [((List, List), Int)] -> [((List, List), Int)]
-conv2prob program = map (\((e, _), l) -> (e, l)) $ zip program probs
+--conv2prob program = map (\((e, _), l) -> (e, l)) $ zip program probs
+conv2prob program = zip (map fst program) probs
   where
-    probs = map (foldr1 (+)) $ tail $ inits $ map snd program
+    probs = map sum $ tail $ inits $ map snd program
 
 -- Select a pair
 ranSel :: [((List, List), Int)] -> IO (List, List)
 ranSel pairs = do
   let modul = snd $ last pairs
-  num <- (`mod` modul) <$> abs <$> randomIO
+  num <- (`mod` modul) . abs <$> randomIO
   return $ fst $ head $ dropWhile (\(_, l) -> l <= num) pairs
 
 -- Select a list from a pair
 selFromPair :: (List, List) -> IO List
-selFromPair (a, b) =
-  if lenOf a == 1 then return b
-  else if lenOf b == 1 then return a
-  else do
-    num <- (`mod` 2) <$> abs <$> (randomIO :: IO Int)
-    if num == 0 then return a
-    else return b
+selFromPair (a, b)
+  | lenOf a == 1
+  = return b
+  | lenOf b == 1
+  = return a
+  | otherwise
+  = do
+      num <- (`mod` 2) . abs <$> randomIO :: IO Int
+      if num == 0 then return a
+      else return b
 
 -- Only called if a deprecated command (and thus a pair) exists
 chooseLength ::
@@ -77,9 +83,9 @@ chooseLength (a, b) dep (Just old_dep) program full_program =
   else do
     let occ_old_dep = length $ filter (== old_dep) full_program
         occ_dep     = length $ filter (== dep) program
-        p0 = occ_old_dep^3 + occ_dep^3
-        p1 = (occ_old_dep + occ_dep + 1) ^3
-    num <- (`mod` p1) <$> abs <$> randomIO
+        p0 = occ_old_dep ^ (3 :: Integer) + occ_dep ^ (3 :: Integer)
+        p1 = (occ_old_dep + occ_dep + 1) ^ (3 :: Integer)
+    num <- (`mod` p1) . abs <$> randomIO
     return $
       if num < p0 then
         highest + 1

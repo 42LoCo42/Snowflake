@@ -11,16 +11,18 @@ import System.IO (hSetBuffering, stdin, BufferMode (NoBuffering))
 import System.Random (randomIO)
 import Control.Monad (when)
 import Data.Char (ord, chr)
+import Data.Maybe (fromMaybe)
 
 flattenShiny :: Thread -> [Thread]
 flattenShiny t@(Thread typ _ ch) =
   (if typ == Shiny then (t:) else id)
-  (foldr (++) [] $ map flattenShiny ch)
+  (concatMap flattenShiny ch)
 
+main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
   args <- getArgs
-  when (length args == 0) $ error "Specify a Snowflake program to execute!"
+  when (null args) $ error "Specify a Snowflake program to execute!"
   let file = head args
   contents <- readFile file
   let program = maybe [] (\(_, l) -> listOf l) $ runParser listP contents
@@ -29,13 +31,13 @@ main = do
 -- Execution model
 snowflakeCycle :: String -> Thread -> [List] -> IO ()
 snowflakeCycle file root program = do
-  let root'          = foldl (\t -> \l -> exec l t) root program
+  let root'          = foldl (flip exec) root program
       threads        = flattenShiny root'
       full_program   = abbrev program ++ last_programs
 
   -- only continue if there is at least one shiny thread left to select
-  if length threads /= 0 then do
-    ran <- (`mod` length threads) <$> abs <$> randomIO
+  if not $ null threads then do
+    ran <- (`mod` length threads) . abs <$> randomIO
     let thread = threads !! ran
         stack  = (\(Thread _ s _) -> s) thread
 
@@ -48,7 +50,7 @@ snowflakeCycle file root program = do
               else if lenOf h1 > 0 then do
                 print $ chr $ lenOf $ head $ listOf h1
                 return $ listToZList $ List Pos $ tail $ listOf h1
-              else do
+              else
                 return h1
       return (h0:h1':t)
 
@@ -68,7 +70,7 @@ snowflakeCycle file root program = do
       -- Update deprecated commands
       pair@(a, b) <- ranSel prob_pairs
       new_dep_command <- selFromPair pair
-      let new_old_dep_command = (dep_command :: Maybe List)
+      let new_old_dep_command = dep_command :: Maybe List
 
       -- Generate new command
       new_length <- chooseLength
@@ -77,10 +79,10 @@ snowflakeCycle file root program = do
         program full_program
       let new_translation = translate a ++ translate b
           inv_translation = translate (revPol b) ++ translate (revPol a)
-      pos_first <- (== 0) <$> (`mod` 2) <$> abs <$> (randomIO :: IO Int)
+      pos_first <- (== 0) . (`mod` 2) . abs <$> (randomIO :: IO Int)
       let fst_pol     = if pos_first then Pos else Neg
           snd_pol     = if pos_first then Neg else Pos
-          new_command = ZList fst_pol new_length
+          new_new_command = ZList fst_pol new_length
           new_highest =
             if new_length <= highest then
               highest
@@ -98,7 +100,7 @@ snowflakeCycle file root program = do
       save
         (Just new_dep_command)
         new_old_dep_command
-        (Just new_command)
+        (Just new_new_command)
         new_highest
         []
         new_translations
@@ -112,23 +114,22 @@ snowflakeCycle file root program = do
 
       -- Create new stack
       return $ stack' ++ [List (polOf $ head stack') [
-        maybe (ZList Pos 0) id new_old_dep_command,
+        fromMaybe (ZList Pos 0) new_old_dep_command,
         new_dep_command,
         a,
         b,
-        new_command
+        new_new_command
         ]]
 
     print stack
     print stack''
-  else do -- execution ends, but we have to append the current program
-    save
-      dep_command
-      old_dep_command
-      new_command
-      highest
-      full_program -- here
-      translations
+  else save -- execution ends, but we have to append the current program
+    dep_command
+    old_dep_command
+    new_command
+    highest
+    full_program -- here
+    translations
 
 {-
 showL :: List -> String

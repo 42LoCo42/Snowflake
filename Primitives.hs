@@ -22,28 +22,28 @@ translate c = safeHead ["nop"] $ map (\(_,_,ps) -> ps) $
 
 --      Command Root thread
 exec :: List -> Thread -> Thread
-exec l t = execPrims (translate l) (safeHead (ZList Pos 0) $ listOf l) t
+exec l = execPrims (translate l) (safeHead (ZList Pos 0) $ listOf l)
 
 --           Primitives  c0      Root thread
 execPrims :: [String] -> List -> Thread -> Thread
 execPrims []    _  t = t
-execPrims (h:r) c0 t =
+execPrims (h:r) c0 t
 -- not the cleanest code in the world, but meh it works
-  if h == "literal"         then op (literal c0) Pos
-  else if h == "illiteral"  then op (literal c0) Neg
-  else if h == "fuse"       then op fuse Pos
-  else if h == "defuse"     then op fuse Neg
-  else if h == "summon"     then op summon Pos
-  else if h == "banish"     then op summon Neg
-  else if h == "fork"       then fork t
-  else if h == "spoon"      then spoon t
-  else if h == "hokey"      then op hokey Pos
-  else if h == "cokey"      then op hokey Neg
-  else if h == "kitten"     then op kitten Pos
-  else if h == "antikitten" then op kitten Neg
-  else execPrims r c0 t -- nop
+  | h == "literal"          = op (literal c0) Pos
+  | h == "illiteral"  = op (literal c0) Neg
+  | h == "fuse"       = op fuse Pos
+  | h == "defuse"     = op fuse Neg
+  | h == "summon"     = op summon Pos
+  | h == "banish"     = op summon Neg
+  | h == "fork"       = fork t
+  | h == "spoon"      = spoon t
+  | h == "hokey"      = op hokey Pos
+  | h == "cokey"      = op hokey Neg
+  | h == "kitten"     = op kitten Pos
+  | h == "antikitten" = op kitten Neg
+  | otherwise         = execPrims r c0 t -- nop
   where
-    op = (\f -> \p -> execPrims r c0 $ shinyMap f p t)
+    op f p = execPrims r c0 $ shinyMap f p t
 
 shinyMap :: ([List] -> Polarity -> [List]) -> Polarity -> Thread -> Thread
 shinyMap f pol (Thread Shiny s ch) = Thread Shiny (f s pol) $ map (shinyMap f pol) ch

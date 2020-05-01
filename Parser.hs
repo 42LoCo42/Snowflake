@@ -24,7 +24,7 @@ instance Applicative Parser where
 
 -- Boolean decisions
 instance Alternative Parser where
-  empty = Parser $ \_ -> Nothing
+  empty = Parser $ const Nothing
   (Parser p1) <|> (Parser p2) = Parser $ \input ->
     p1 input <|> p2 input
 
@@ -38,7 +38,7 @@ charP c = Parser f where
 
 -- Uses chaining to parse a string
 stringP :: String -> Parser String
-stringP s = sequenceA $ map charP s
+stringP = traverse charP
 
 -- Parses a range of consecutive elements based on a predicate
 spanP :: (Char -> Bool) -> Parser String
@@ -60,4 +60,4 @@ notNull (Parser p) = Parser $ \input -> do
 
 -- A Parser to separate elements from eachother
 sepBy :: Parser a -> Parser b -> Parser [b]
-sepBy sep elem = (:) <$> elem <*> many (sep *> elem) <|> pure []
+sepBy sep element = (:) <$> element <*> many (sep *> element) <|> pure []

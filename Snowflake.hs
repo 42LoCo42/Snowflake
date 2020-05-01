@@ -27,7 +27,7 @@ listToZList this@(List p l)
   where
     zeroList  = List Pos []
     zeroZList = ZList Pos 0
-    canConvert = foldr (\a -> \r -> r && (a == zeroList || a == zeroZList)) True l
+    canConvert = foldr (\a r -> r && (a == zeroList || a == zeroZList)) True l
 
 listToZList l = l
 
