@@ -1,22 +1,21 @@
-import Primitives
-import Snowflake
-import SnowflakeParser
-import Parser
+import Control.Monad (when)
+import Data.Char (chr, ord)
+import Data.Maybe (fromMaybe)
 import Modify
+import Parser
+import Primitives
 import SaveState
 import SaveStateCreate
-
+import Snowflake
+import SnowflakeParser
 import System.Environment (getArgs)
-import System.IO (hSetBuffering, stdin, BufferMode (NoBuffering))
+import System.IO (BufferMode (NoBuffering), hSetBuffering, stdin)
 import System.Random (randomIO)
-import Control.Monad (when)
-import Data.Char (ord, chr)
-import Data.Maybe (fromMaybe)
 
 flattenShiny :: Thread -> [Thread]
 flattenShiny t@(Thread typ _ ch) =
-  (if typ == Shiny then (t:) else id)
-  (concatMap flattenShiny ch)
+  (if typ == Shiny then (t :) else id)
+    (concatMap flattenShiny ch)
 
 main :: IO ()
 main = do
@@ -31,106 +30,112 @@ main = do
 -- Execution model
 snowflakeCycle :: String -> Thread -> [List] -> IO ()
 snowflakeCycle file root program = do
-  let root'          = foldl (flip exec) root program
-      threads        = flattenShiny root'
-      full_program   = abbrev program ++ last_programs
-
+  let root' = foldl (flip exec) root program
+      threads = flattenShiny root'
+      full_program = abbrev program ++ last_programs
   -- only continue if there is at least one shiny thread left to select
-  if not $ null threads then do
-    ran <- (`mod` length threads) . abs <$> randomIO
-    let thread = threads !! ran
-        stack  = (\(Thread _ s _) -> s) thread
-
-    -- Perform IO
-    stack' <- if length stack < 2 then return stack else do
-      let (h0:h1:t) = stack
-      h1'  <- if polOf h1 == Neg then do
-                c <- getChar
-                return $ listToZList $ List Neg $ listOf h1 ++ [ZList Pos $ ord c]
-              else if lenOf h1 > 0 then do
-                print $ chr $ lenOf $ head $ listOf h1
-                return $ listToZList $ List Pos $ tail $ listOf h1
-              else
-                return h1
-      return (h0:h1':t)
-
-    -- Perform language changes
-    let prob_pairs = conv2prob $ pairsquares full_program
-    stack'' <- if length full_program < 2 ||
-                  null prob_pairs then do
-      save
+  if not $ null threads
+    then do
+      ran <- (`mod` length threads) . abs <$> randomIO
+      let thread = threads !! ran
+          stack = (\(Thread _ s _) -> s) thread
+      -- Perform IO
+      stack' <-
+        if length stack < 2
+          then return stack
+          else do
+            let (h0 : h1 : t) = stack
+            h1' <-
+              if polOf h1 == Neg
+                then do
+                  c <- getChar
+                  return $ listToZList $ List Neg $ listOf h1 ++ [ZList Pos $ ord c]
+                else
+                  if lenOf h1 > 0
+                    then do
+                      print $ chr $ lenOf $ head $ listOf h1
+                      return $ listToZList $ List Pos $ tail $ listOf h1
+                    else return h1
+            return (h0 : h1' : t)
+      -- Perform language changes
+      let prob_pairs = conv2prob $ pairsquares full_program
+      stack'' <-
+        if length full_program < 2
+          || null prob_pairs
+          then do
+            save
+              dep_command
+              old_dep_command
+              new_command
+              highest
+              full_program
+              translations
+            return stack'
+          else do
+            -- Update deprecated commands
+            pair@(a, b) <- ranSel prob_pairs
+            new_dep_command <- selFromPair pair
+            let new_old_dep_command = dep_command :: Maybe List
+            -- Generate new command
+            new_length <-
+              chooseLength
+                pair
+                new_dep_command
+                new_old_dep_command
+                program
+                full_program
+            let new_translation = translate a ++ translate b
+                inv_translation = translate (revPol b) ++ translate (revPol a)
+            pos_first <- (== 0) . (`mod` 2) . abs <$> (randomIO :: IO Int)
+            let fst_pol = if pos_first then Pos else Neg
+                snd_pol = if pos_first then Neg else Pos
+                new_new_command = ZList fst_pol new_length
+                new_highest =
+                  if new_length <= highest
+                    then highest
+                    else new_length
+                -- Update translations
+                -- By filtering we replace existing commands with that length
+                new_translations =
+                  (fst_pol, new_length, new_translation)
+                    : (snd_pol, new_length, inv_translation)
+                    : filter (\(_, l, _) -> l /= new_length) translations
+            -- Save everything
+            save
+              (Just new_dep_command)
+              new_old_dep_command
+              (Just new_new_command)
+              new_highest
+              []
+              new_translations
+            print pair
+            print new_dep_command
+            print new_old_dep_command
+            print new_length
+            print new_translation
+            print inv_translation
+            -- Create new stack
+            return $
+              stack'
+                ++ [ List
+                       (polOf $ head stack')
+                       [ fromMaybe (ZList Pos 0) new_old_dep_command,
+                         new_dep_command,
+                         a,
+                         b,
+                         new_new_command
+                       ]
+                   ]
+      print stack
+      print stack''
+    else
+      save -- execution ends, but we have to append the current program
         dep_command
         old_dep_command
         new_command
         highest
-        full_program
+        full_program -- here
         translations
-      return stack'
-    else do
-      -- Update deprecated commands
-      pair@(a, b) <- ranSel prob_pairs
-      new_dep_command <- selFromPair pair
-      let new_old_dep_command = dep_command :: Maybe List
-
-      -- Generate new command
-      new_length <- chooseLength
-        pair
-        new_dep_command new_old_dep_command
-        program full_program
-      let new_translation = translate a ++ translate b
-          inv_translation = translate (revPol b) ++ translate (revPol a)
-      pos_first <- (== 0) . (`mod` 2) . abs <$> (randomIO :: IO Int)
-      let fst_pol     = if pos_first then Pos else Neg
-          snd_pol     = if pos_first then Neg else Pos
-          new_new_command = ZList fst_pol new_length
-          new_highest =
-            if new_length <= highest then
-              highest
-            else
-              new_length
-
-      -- Update translations
-      -- By filtering we replace existing commands with that length
-          new_translations =
-            (fst_pol, new_length, new_translation) :
-            (snd_pol, new_length, inv_translation) :
-            filter (\(_, l, _) -> l /= new_length) translations
-
-      -- Save everything
-      save
-        (Just new_dep_command)
-        new_old_dep_command
-        (Just new_new_command)
-        new_highest
-        []
-        new_translations
-
-      print pair
-      print new_dep_command
-      print new_old_dep_command
-      print new_length
-      print new_translation
-      print inv_translation
-
-      -- Create new stack
-      return $ stack' ++ [List (polOf $ head stack') [
-        fromMaybe (ZList Pos 0) new_old_dep_command,
-        new_dep_command,
-        a,
-        b,
-        new_new_command
-        ]]
-
-    print stack
-    print stack''
-  else save -- execution ends, but we have to append the current program
-    dep_command
-    old_dep_command
-    new_command
-    highest
-    full_program -- here
-    translations
-
 {-
 showL :: List -> String
 showL (ZList p len) = (if p == Pos then "+" else "-") ++ show len

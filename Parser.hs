@@ -4,9 +4,10 @@ import Control.Applicative
 import Data.Char
 
 -- We need an explicit unwrapping function to use the Parser outside of patterns
-newtype Parser a = Parser {
-  runParser :: String -> Maybe (String, a)
-}
+newtype Parser a
+  = Parser
+      { runParser :: String -> Maybe (String, a)
+      }
 
 -- Level 1 Penetration
 instance Functor Parser where
@@ -18,7 +19,7 @@ instance Functor Parser where
 instance Applicative Parser where
   pure x = Parser $ \input -> Just (input, x)
   (Parser p1) <*> (Parser p2) = Parser $ \input -> do
-    (input', f)  <- p1 input
+    (input', f) <- p1 input
     (input'', x) <- p2 input'
     Just (input'', f x)
 
@@ -30,11 +31,12 @@ instance Alternative Parser where
 
 -- Constructs a parser for a single char
 charP :: Char -> Parser Char
-charP c = Parser f where
-  f []          = Nothing
-  f (x:xs)
-    | c == x    = Just (xs, c)
-    | otherwise = Nothing
+charP c = Parser f
+  where
+    f [] = Nothing
+    f (x : xs)
+      | c == x = Just (xs, c)
+      | otherwise = Nothing
 
 -- Uses chaining to parse a string
 stringP :: String -> Parser String
